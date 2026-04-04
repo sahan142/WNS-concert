@@ -697,8 +697,47 @@ window.generateQR = function(){
   document.getElementById("qrLabel").textContent = seat;
 };
 
+// ── Scanner instance (kept across scans) ──
+let html5QrCode = null;
+let isScanning = false;
+
+function setCameraUI(active) {
+  const btn = document.getElementById("scanBtn");
+  const reader = document.getElementById("reader");
+  const scanLine = document.getElementById("scanLine");
+  const scanCorners = document.getElementById("scanCorners");
+  if(active){
+    btn.textContent = "⏳ Scanning...";
+    btn.disabled = true;
+    reader.classList.add('scanning');
+    scanLine.classList.add('active');
+    scanCorners.classList.add('active');
+  } else {
+    btn.textContent = "📷 Scan Next Ticket";
+    btn.disabled = false;
+    reader.classList.remove('scanning');
+    scanLine.classList.remove('active');
+    scanCorners.classList.remove('active');
+  }
+}
+
+function stopCamera(){
+  if(html5QrCode && isScanning){
+    html5QrCode.stop().catch(()=>{});
+    isScanning = false;
+  }
+  setCameraUI(false);
+}
+
 // ── Scan logic ──
 async function handleScan(decodedText){
+  if(!isScanning) return; // prevent double-fire
+  isScanning = false;
+
+  // Stop camera immediately
+  await html5QrCode.stop().catch(()=>{});
+  setCameraUI(false);
+
   playBeep(validSeats.includes(decodedText) ? 'success' : 'error');
 
   const resultDiv = document.getElementById("result");
@@ -733,27 +772,30 @@ async function handleScan(decodedText){
   }
 }
 
-// ── Start scanner ──
-window.startScanner = function(){
-  document.getElementById("scanBtn").disabled = true;
-  document.getElementById("scanBtn").textContent = "📷 Scanner Active...";
-  document.getElementById("reader").classList.add('scanning');
-  document.getElementById("scanLine").classList.add('active');
-  document.getElementById("scanCorners").classList.add('active');
+// ── Start / restart scanner ──
+window.startScanner = async function(){
+  // Hide previous result
+  document.getElementById("result").className = 'result';
 
-  const html5QrCode = new Html5Qrcode("reader");
-  html5QrCode.start(
-    { facingMode: "environment" },
-    { fps: 15, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
-    handleScan
-  ).catch(() => {
-    alert("Camera access denied or not supported!");
-    document.getElementById("scanBtn").disabled = false;
+  setCameraUI(true);
+
+  // Create scanner once, reuse after
+  if(!html5QrCode){
+    html5QrCode = new Html5Qrcode("reader");
+  }
+
+  try {
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 15, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
+      handleScan
+    );
+    isScanning = true;
+  } catch(err) {
+    alert("Camera access denied or not supported!\n\nMake sure you opened this on https://");
+    setCameraUI(false);
     document.getElementById("scanBtn").textContent = "📷 Activate Scanner";
-    document.getElementById("reader").classList.remove('scanning');
-    document.getElementById("scanLine").classList.remove('active');
-    document.getElementById("scanCorners").classList.remove('active');
-  });
+  }
 };
 </script>
 
