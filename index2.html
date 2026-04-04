@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WNS Concert QR PRO</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+  :root {
+    --neon-blue: #00d4ff;
+    --neon-pink: #ff0080;
+    --neon-gold: #ffd700;
+    --neon-green: #00ff88;
+    --dark: #050810;
+    --card: rgba(10, 15, 35, 0.92);
+    --glass: rgba(0, 212, 255, 0.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--dark);
+    color: white;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ── Animated background ── */
+  .bg-scene {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  /* Spotlight beams */
+  .beam {
+    position: absolute;
+    bottom: 0;
+    width: 3px;
+    height: 70vh;
+    border-radius: 50px;
+    transform-origin: bottom center;
+    opacity: 0.18;
+    filter: blur(6px);
+  }
+  .beam:nth-child(1){ left:15%; background:var(--neon-blue); animation: sweep1 6s ease-in-out infinite; }
+  .beam:nth-child(2){ left:30%; background:var(--neon-pink); animation: sweep2 8s ease-in-out infinite 1s; }
+  .beam:nth-child(3){ left:55%; background:var(--neon-gold); animation: sweep1 7s ease-in-out infinite 2s; }
+  .beam:nth-child(4){ left:70%; background:var(--neon-blue); animation: sweep2 5s ease-in-out infinite 0.5s; }
+  .beam:nth-child(5){ left:85%; background:var(--neon-pink); animation: sweep1 9s ease-in-out infinite 3s; }
+
+  @keyframes sweep1 {
+    0%,100% { transform: rotate(-25deg); opacity:0.12; }
+    50% { transform: rotate(25deg); opacity:0.28; }
+  }
+  @keyframes sweep2 {
+    0%,100% { transform: rotate(20deg); opacity:0.2; }
+    50% { transform: rotate(-30deg); opacity:0.1; }
+  }
+
+  /* Floating particles */
+  .particles { position: absolute; inset: 0; }
+  .dot {
+    position: absolute;
+    border-radius: 50%;
+    animation: float-up linear infinite;
+    opacity: 0;
+  }
+  @keyframes float-up {
+    0% { transform: translateY(100vh) scale(0); opacity:0; }
+    10% { opacity:1; }
+    90% { opacity:0.6; }
+    100% { transform: translateY(-20px) scale(1); opacity:0; }
+  }
+
+  /* Grid floor */
+  .grid-floor {
+    position: absolute;
+    bottom: 0;
+    left: -50%;
+    width: 200%;
+    height: 300px;
+    background:
+      linear-gradient(to bottom, transparent 0%, rgba(0,212,255,0.04) 100%),
+      repeating-linear-gradient(90deg, rgba(0,212,255,0.07) 0px, transparent 1px, transparent 60px, rgba(0,212,255,0.07) 61px),
+      repeating-linear-gradient(0deg, rgba(0,212,255,0.07) 0px, transparent 1px, transparent 60px, rgba(0,212,255,0.07) 61px);
+    transform: perspective(400px) rotateX(60deg);
+    transform-origin: bottom;
+  }
+
+  /* Ambient glow orbs */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: pulse-orb 5s ease-in-out infinite alternate;
+  }
+  .orb1 { width:400px; height:400px; background:rgba(0,212,255,0.07); top:-100px; left:-100px; animation-delay:0s; }
+  .orb2 { width:350px; height:350px; background:rgba(255,0,128,0.06); top:30%; right:-80px; animation-delay:2s; }
+  .orb3 { width:300px; height:300px; background:rgba(255,215,0,0.04); bottom:10%; left:20%; animation-delay:1s; }
+
+  @keyframes pulse-orb {
+    from { transform: scale(1); opacity:0.6; }
+    to { transform: scale(1.3); opacity:1; }
+  }
+
+  /* ── Content ── */
+  .page {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px 40px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+    animation: slide-down 0.8s cubic-bezier(.16,1,.3,1) both;
+  }
+  @keyframes slide-down {
+    from { opacity:0; transform:translateY(-30px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+
+  .logo-badge {
+    display: inline-block;
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 6px;
+    padding: 4px 14px;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--neon-blue);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    background: rgba(0,212,255,0.05);
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.4rem, 8vw, 4rem);
+    letter-spacing: 4px;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 30%, var(--neon-blue) 70%, var(--neon-pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 20px rgba(0,212,255,0.4));
+  }
+
+  .subtitle {
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 4px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 440px;
+    animation: slide-down 0.8s 0.1s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 12px 10px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: rgba(255,255,255,0.45);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .tab-btn.active {
+    background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(255,0,128,0.1));
+    color: white;
+    box-shadow: 0 0 20px rgba(0,212,255,0.2), inset 0 0 20px rgba(0,212,255,0.05);
+    border: 1px solid rgba(0,212,255,0.3);
+  }
+
+  /* Card */
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--card);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 24px;
+    padding: 28px 24px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 0 60px rgba(0,212,255,0.06), 0 30px 60px rgba(0,0,0,0.5);
+    animation: slide-up 0.8s 0.2s cubic-bezier(.16,1,.3,1) both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  @keyframes slide-up {
+    from { opacity:0; transform:translateY(40px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+
+  .card::before {
+    content:'';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,212,255,0.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* Panel switching */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Section label */
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--neon-blue);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after {
+    content:'';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, rgba(0,212,255,0.3), transparent);
+  }
+
+  /* Input */
+  .input-wrap {
+    position: relative;
+    margin-bottom: 14px;
+  }
+
+  .input-wrap input {
+    width: 100%;
+    padding: 14px 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    color: white;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+    outline: none;
+  }
+
+  .input-wrap input:focus {
+    border-color: var(--neon-blue);
+    background: rgba(0,212,255,0.05);
+    box-shadow: 0 0 20px rgba(0,212,255,0.15);
+  }
+
+  .input-wrap input::placeholder { color: rgba(255,255,255,0.25); }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #0070ff, #00d4ff);
+    color: white;
+    box-shadow: 0 4px 30px rgba(0,212,255,0.35);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 40px rgba(0,212,255,0.5);
+  }
+
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-scan {
+    background: linear-gradient(135deg, #8b00ff, #ff0080);
+    color: white;
+    box-shadow: 0 4px 30px rgba(255,0,128,0.3);
+  }
+
+  .btn-scan:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 40px rgba(255,0,128,0.5);
+  }
+
+  /* Ripple */
+  .btn::after {
+    content:'';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.25) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .btn:active::after { opacity:1; }
+
+  /* QR display box */
+  #qrcode {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+
+  #qrcode canvas, #qrcode img {
+    border-radius: 12px;
+    border: 3px solid rgba(0,212,255,0.3);
+    box-shadow: 0 0 30px rgba(0,212,255,0.25), 0 0 60px rgba(0,212,255,0.1);
+    animation: qr-appear 0.5s cubic-bezier(.34,1.56,.64,1) both;
+  }
+
+  @keyframes qr-appear {
+    from { opacity:0; transform:scale(0.6) rotate(-5deg); }
+    to { opacity:1; transform:scale(1) rotate(0deg); }
+  }
+
+  .qr-label {
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    margin-top: 10px;
+  }
+
+  /* Scanner */
+  #reader {
+    width: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 2px solid rgba(0,212,255,0.25);
+    margin-top: 16px;
+    position: relative;
+  }
+
+  /* Scan line animation */
+  .scan-overlay {
+    position: relative;
+    margin-top: 16px;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .scan-line {
+    display: none;
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--neon-blue), var(--neon-pink), transparent);
+    z-index: 10;
+    animation: scan 2s linear infinite;
+    box-shadow: 0 0 8px var(--neon-blue);
+  }
+
+  .scan-line.active { display: block; }
+
+  @keyframes scan {
+    from { top: 0%; }
+    to { top: 100%; }
+  }
+
+  /* Corner brackets on scanner */
+  .scan-corners {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    pointer-events: none;
+  }
+  .scan-corners.active { display: block; }
+  .scan-corners::before, .scan-corners::after,
+  .scan-corners span::before, .scan-corners span::after {
+    content:'';
+    position: absolute;
+    width: 22px; height: 22px;
+    border-color: var(--neon-blue);
+    border-style: solid;
+  }
+  .scan-corners::before { top:10px; left:10px; border-width:3px 0 0 3px; border-radius:4px 0 0 0; }
+  .scan-corners::after  { top:10px; right:10px; border-width:3px 3px 0 0; border-radius:0 4px 0 0; }
+  .scan-corners span::before { bottom:10px; left:10px; border-width:0 0 3px 3px; border-radius:0 0 0 4px; }
+  .scan-corners span::after  { bottom:10px; right:10px; border-width:0 3px 3px 0; border-radius:0 0 4px 0; }
+
+  /* Result display */
+  .result {
+    margin-top: 20px;
+    padding: 18px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: 1px;
+    text-align: center;
+    display: none;
+  }
+
+  .result.visible { display: block; }
+
+  .result-icon {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 6px;
+    animation: pop 0.4s cubic-bezier(.34,1.56,.64,1) both;
+  }
+
+  @keyframes pop {
+    from { transform:scale(0); }
+    to { transform:scale(1); }
+  }
+
+  .result.success {
+    background: linear-gradient(135deg, rgba(0,255,136,0.15), rgba(0,212,255,0.1));
+    border: 1px solid rgba(0,255,136,0.4);
+    color: var(--neon-green);
+    box-shadow: 0 0 40px rgba(0,255,136,0.2);
+    animation: success-flash 0.6s ease;
+  }
+
+  .result.error {
+    background: linear-gradient(135deg, rgba(255,0,80,0.15), rgba(255,60,0,0.1));
+    border: 1px solid rgba(255,0,80,0.4);
+    color: #ff4060;
+    box-shadow: 0 0 40px rgba(255,0,80,0.2);
+    animation: error-shake 0.5s ease;
+  }
+
+  @keyframes success-flash {
+    0% { transform:scale(0.95); box-shadow:0 0 0 rgba(0,255,136,0); }
+    50% { box-shadow:0 0 60px rgba(0,255,136,0.5); }
+    100% { transform:scale(1); }
+  }
+
+  @keyframes error-shake {
+    0%,100% { transform:translateX(0); }
+    20%,60% { transform:translateX(-8px); }
+    40%,80% { transform:translateX(8px); }
+  }
+
+  .seat-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 3px;
+    margin-top: 4px;
+    opacity: 0.9;
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(0,212,255,0.2), transparent);
+    margin: 8px 0 20px;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 24px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.15);
+    text-transform: uppercase;
+    animation: slide-up 0.8s 0.3s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  /* Pulse ring on active scan */
+  @keyframes ring-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0,212,255,0.4); }
+    70% { box-shadow: 0 0 0 20px rgba(0,212,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(0,212,255,0); }
+  }
+
+  #reader.scanning {
+    animation: ring-pulse 1.5s infinite;
+    border-color: var(--neon-blue);
+  }
+</style>
+</head>
+<body>
+
+<!-- Background scene -->
+<div class="bg-scene">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+  <div class="beam"></div>
+  <div class="beam"></div>
+  <div class="beam"></div>
+  <div class="beam"></div>
+  <div class="beam"></div>
+  <div class="particles" id="particles"></div>
+  <div class="grid-floor"></div>
+</div>
+
+<!-- Page content -->
+<div class="page">
+
+  <div class="header">
+    <div class="logo-badge">🎫 WNS G11</div>
+    <h1>CONCERT PRO</h1>
+    <div class="subtitle">Ticket Verification System</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('generate', this)">⚡ Generate</button>
+    <button class="tab-btn" onclick="switchTab('scan', this)">📷 Scan</button>
+  </div>
+
+  <!-- Card -->
+  <div class="card">
+
+    <!-- Generate Panel -->
+    <div class="panel active" id="panel-generate">
+      <div class="section-label">Generate Ticket QR</div>
+
+      <div class="input-wrap">
+        <input id="seatInput" type="text" placeholder="e.g. WNS G 11 Seat 001" autocomplete="off">
+      </div>
+
+      <button class="btn btn-primary" onclick="generateQR()">Generate QR Code</button>
+
+      <div id="qrcode"></div>
+      <div class="qr-label" id="qrLabel"></div>
+    </div>
+
+    <!-- Scan Panel -->
+    <div class="panel" id="panel-scan">
+      <div class="section-label">Scan Ticket</div>
+
+      <button class="btn btn-scan" onclick="startScanner()" id="scanBtn">📷 Activate Scanner</button>
+
+      <div class="scan-overlay" id="scanOverlay">
+        <div class="scan-line" id="scanLine"></div>
+        <div class="scan-corners" id="scanCorners"><span></span></div>
+        <div id="reader"></div>
+      </div>
+
+      <div class="result" id="result">
+        <span class="result-icon" id="resultIcon"></span>
+        <div id="resultMsg"></div>
+        <div class="seat-text" id="resultSeat"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">WNS Grade 11 — 2025</div>
+</div>
+
+<!-- Sounds generated via Web Audio API — no external dependency -->
+<script>
+// ── Particle generator ──
+(function(){
+  const container = document.getElementById('particles');
+  const colors = ['#00d4ff','#ff0080','#ffd700','#00ff88','#ffffff'];
+  for(let i=0;i<35;i++){
+    const d = document.createElement('div');
+    d.className = 'dot';
+    const size = Math.random()*4+1;
+    d.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-duration:${Math.random()*10+6}s;
+      animation-delay:${Math.random()*10}s;
+      box-shadow: 0 0 ${size*2}px currentColor;
+    `;
+    container.appendChild(d);
+  }
+})();
+
+// ── Web Audio beep ──
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+
+function playBeep(type='success'){
+  try {
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if(type === 'success'){
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+
+      // Second note
+      setTimeout(()=>{
+        const o2 = ctx.createOscillator();
+        const g2 = ctx.createGain();
+        o2.connect(g2); g2.connect(ctx.destination);
+        o2.frequency.setValueAtTime(1320, ctx.currentTime);
+        g2.gain.setValueAtTime(0.25, ctx.currentTime);
+        g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.25);
+        o2.start(ctx.currentTime); o2.stop(ctx.currentTime+0.25);
+      }, 130);
+
+    } else {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(200, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    }
+  } catch(e) {}
+}
+
+// ── Tab switching ──
+function switchTab(tab, btn){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAFjkCTB7J4jbjwBVpI0Kf8L48JFMulgCQ",
+  authDomain: "wns-g11-concert.firebaseapp.com",
+  projectId: "wns-g11-concert",
+  storageBucket: "wns-g11-concert.firebasestorage.app",
+  messagingSenderId: "1071736409074",
+  appId: "1:1071736409074:web:91cf0a5baa9d540748b96b"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Seat list (unchanged)
+let validSeats = [];
+for(let i=1;i<=500;i++){
+  validSeats.push(`WNS G 11 Seat ${i.toString().padStart(3,'0')}`);
+}
+
+// ── Generate QR ──
+window.generateQR = function(){
+  const seat = document.getElementById("seatInput").value.trim();
+  if(!validSeats.includes(seat)){
+    document.getElementById("qrcode").innerHTML = '';
+    document.getElementById("qrLabel").textContent = '';
+    alert("⚠️ Invalid Seat! Use format: WNS G 11 Seat 001");
+    return;
+  }
+  document.getElementById("qrcode").innerHTML = "";
+  new QRCode(document.getElementById("qrcode"), {
+    text: seat,
+    width: 200,
+    height: 200,
+    colorDark: "#0a0f23",
+    colorLight: "#ffffff"
+  });
+  document.getElementById("qrLabel").textContent = seat;
+};
+
+// ── Scan logic ──
+async function handleScan(decodedText){
+  playBeep(validSeats.includes(decodedText) ? 'success' : 'error');
+
+  const resultDiv = document.getElementById("result");
+  const icon = document.getElementById("resultIcon");
+  const msg = document.getElementById("resultMsg");
+  const seatEl = document.getElementById("resultSeat");
+
+  resultDiv.className = 'result';
+
+  if(!validSeats.includes(decodedText)){
+    resultDiv.classList.add('visible','error');
+    icon.textContent = '🚫';
+    msg.textContent = 'INVALID TICKET';
+    seatEl.textContent = decodedText;
+    return;
+  }
+
+  const ref = doc(db, "tickets", decodedText);
+  const snap = await getDoc(ref);
+
+  if(!snap.exists() || !snap.data().used){
+    await setDoc(ref, { used: true });
+    resultDiv.classList.add('visible','success');
+    icon.textContent = '✅';
+    msg.textContent = 'ACCESS GRANTED';
+    seatEl.textContent = decodedText;
+  } else {
+    resultDiv.classList.add('visible','error');
+    icon.textContent = '⛔';
+    msg.textContent = 'ALREADY USED';
+    seatEl.textContent = decodedText;
+  }
+}
+
+// ── Start scanner ──
+window.startScanner = function(){
+  document.getElementById("scanBtn").disabled = true;
+  document.getElementById("scanBtn").textContent = "📷 Scanner Active...";
+  document.getElementById("reader").classList.add('scanning');
+  document.getElementById("scanLine").classList.add('active');
+  document.getElementById("scanCorners").classList.add('active');
+
+  const html5QrCode = new Html5Qrcode("reader");
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 15, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
+    handleScan
+  ).catch(() => {
+    alert("Camera access denied or not supported!");
+    document.getElementById("scanBtn").disabled = false;
+    document.getElementById("scanBtn").textContent = "📷 Activate Scanner";
+    document.getElementById("reader").classList.remove('scanning');
+    document.getElementById("scanLine").classList.remove('active');
+    document.getElementById("scanCorners").classList.remove('active');
+  });
+};
+</script>
+
+</body>
+</html>
