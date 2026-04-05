@@ -122,6 +122,22 @@
     padding: 20px 16px 40px;
   }
 
+  /* Powered by */
+  .powered-by {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    animation: slide-down 0.6s cubic-bezier(.16,1,.3,1) both;
+  }
+  .powered-by span {
+    color: var(--neon-gold);
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-shadow: 0 0 10px rgba(255,215,0,0.5);
+  }
+
   /* Header */
   .header {
     text-align: center;
@@ -292,9 +308,16 @@
     font-size: 20px;
     letter-spacing: 3px;
     cursor: pointer;
-    transition: all 0.25s ease;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
     position: relative;
     overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
   }
 
   .btn-primary {
@@ -529,6 +552,8 @@
 <!-- Page content -->
 <div class="page">
 
+  <div class="powered-by">⚡ Powered by <span>Sahan Tharuka</span></div>
+
   <div class="header">
     <div class="logo-badge">🎫 WNS G11</div>
     <h1>CONCERT PRO</h1>
@@ -579,7 +604,7 @@
 
   </div>
 
-  <div class="footer">WNS Grade 11 — 2026</div>
+  <div class="footer">WNS Grade 11 — 2025</div>
 </div>
 
 <!-- Sounds generated via Web Audio API — no external dependency -->
@@ -697,15 +722,16 @@ window.generateQR = function(){
   document.getElementById("qrLabel").textContent = seat;
 };
 
-// ── Scanner instance (kept across scans) ──
+// ── Scanner state ──
 let html5QrCode = null;
 let isScanning = false;
+let scanLock = false; // prevents double-tap while camera is starting
 
 function setCameraUI(active) {
   const btn = document.getElementById("scanBtn");
-  const reader = document.getElementById("reader");
   const scanLine = document.getElementById("scanLine");
   const scanCorners = document.getElementById("scanCorners");
+  const reader = document.getElementById("reader");
   if(active){
     btn.textContent = "⏳ Scanning...";
     btn.disabled = true;
@@ -721,23 +747,16 @@ function setCameraUI(active) {
   }
 }
 
-function stopCamera(){
-  if(html5QrCode && isScanning){
-    html5QrCode.stop().catch(()=>{});
-    isScanning = false;
-  }
-  setCameraUI(false);
-}
-
-// ── Scan logic ──
+// ── Scan result handler ──
 async function handleScan(decodedText){
-  if(!isScanning) return; // prevent double-fire
+  if(!isScanning) return; // block double-fire
   isScanning = false;
 
-  // Stop camera immediately
-  await html5QrCode.stop().catch(()=>{});
+  // Stop camera right away — don't await, fire and forget for speed
+  html5QrCode.stop().catch(()=>{});
   setCameraUI(false);
 
+  // Play sound immediately (non-blocking)
   playBeep(validSeats.includes(decodedText) ? 'success' : 'error');
 
   const resultDiv = document.getElementById("result");
@@ -745,56 +764,91 @@ async function handleScan(decodedText){
   const msg = document.getElementById("resultMsg");
   const seatEl = document.getElementById("resultSeat");
 
+  // Reset classes first to re-trigger animations
   resultDiv.className = 'result';
+  // Force reflow so animation replays
+  void resultDiv.offsetWidth;
 
   if(!validSeats.includes(decodedText)){
     resultDiv.classList.add('visible','error');
     icon.textContent = '🚫';
     msg.textContent = 'INVALID TICKET';
     seatEl.textContent = decodedText;
+    scanLock = false;
     return;
   }
 
-  const ref = doc(db, "tickets", decodedText);
-  const snap = await getDoc(ref);
+  // Show optimistic UI instantly while Firebase runs in background
+  resultDiv.classList.add('visible','success');
+  icon.textContent = '⏳';
+  msg.textContent = 'CHECKING...';
+  seatEl.textContent = decodedText;
 
-  if(!snap.exists() || !snap.data().used){
-    await setDoc(ref, { used: true });
-    resultDiv.classList.add('visible','success');
-    icon.textContent = '✅';
-    msg.textContent = 'ACCESS GRANTED';
-    seatEl.textContent = decodedText;
-  } else {
-    resultDiv.classList.add('visible','error');
-    icon.textContent = '⛔';
-    msg.textContent = 'ALREADY USED';
-    seatEl.textContent = decodedText;
+  try {
+    const ref = doc(db, "tickets", decodedText);
+    const snap = await getDoc(ref);
+
+    if(!snap.exists() || !snap.data().used){
+      await setDoc(ref, { used: true });
+      icon.textContent = '✅';
+      msg.textContent = 'ACCESS GRANTED';
+      resultDiv.className = 'result visible success';
+    } else {
+      playBeep('error');
+      icon.textContent = '⛔';
+      msg.textContent = 'ALREADY USED';
+      resultDiv.className = 'result visible error';
+    }
+  } catch(e) {
+    icon.textContent = '⚠️';
+    msg.textContent = 'NETWORK ERROR';
+    resultDiv.className = 'result visible error';
   }
+
+  scanLock = false;
 }
 
 // ── Start / restart scanner ──
+// Key fix: html5-qrcode cannot restart on same instance after stop.
+// Must clear the reader div and create a fresh instance each time.
 window.startScanner = async function(){
-  // Hide previous result
-  document.getElementById("result").className = 'result';
+  if(scanLock) return; // ignore rapid double-taps
+  scanLock = true;
 
+  // Hide previous result instantly
+  document.getElementById("result").className = 'result';
   setCameraUI(true);
 
-  // Create scanner once, reuse after
-  if(!html5QrCode){
-    html5QrCode = new Html5Qrcode("reader");
+  // IMPORTANT: destroy old instance and wipe reader div before restarting
+  if(html5QrCode){
+    try { await html5QrCode.stop(); } catch(e){}
+    try { await html5QrCode.clear(); } catch(e){}
+    html5QrCode = null;
   }
+  document.getElementById("reader").innerHTML = '';
+
+  html5QrCode = new Html5Qrcode("reader");
 
   try {
     await html5QrCode.start(
       { facingMode: "environment" },
-      { fps: 15, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
+      {
+        fps: 30,                            // max scan speed
+        qrbox: { width: 220, height: 220 },
+        aspectRatio: 1.0,
+        disableFlip: false,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true } // uses native API if available = faster
+      },
       handleScan
     );
     isScanning = true;
+    scanLock = false;
   } catch(err) {
-    alert("Camera access denied or not supported!\n\nMake sure you opened this on https://");
+    alert("Camera access denied!\n\nOpen this page on https:// in Chrome.");
     setCameraUI(false);
     document.getElementById("scanBtn").textContent = "📷 Activate Scanner";
+    html5QrCode = null;
+    scanLock = false;
   }
 };
 </script>
